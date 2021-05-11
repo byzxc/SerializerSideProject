@@ -503,18 +503,6 @@ namespace JSON
 			int allahValue = reader.GetValue<int>(s);
 			std::cout << allahValue << std::endl;
 		}
-		//std::vector<std::string> dogVector;
-		//dogVector.push_back("Cb");
-		//dogVector.push_back("Knn");
-		//writer.PutValue("DogVector", dogVector);
-
-		//std::map<std::string, int> cowMap;
-		//cowMap.emplace("cow", 1);
-		//cowMap.emplace("cownnie", 2);
-		//writer.PutValue("CowMap", cowMap);
-
-		//writer.PutKey("alllah");
-		//writer.PutValue(1);
 	private:
 	};
 
