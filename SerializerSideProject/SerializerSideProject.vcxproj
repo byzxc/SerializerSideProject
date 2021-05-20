@@ -80,15 +80,17 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)Executables\$(Configuration)\</OutDir>
     <IntDir>Objects\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)Dependencies\rapidjson;$(SolutionDir)Dependencies\fmod;$(SolutionDir)SerializerSideProject;$(SolutionDir);$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)SerializerSideProject;$(IncludePath)</IncludePath>
     <TargetName>Serializer</TargetName>
+    <LibraryPath>$(SolutionDir)Dependencies\rttr\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)Executables\$(Configuration)\</OutDir>
     <IntDir>Objects\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)Dependencies\rapidjson;$(SolutionDir)Dependencies\fmod;$(SolutionDir)SerializerSideProject;$(SolutionDir);$(IncludePath)</IncludePath>
+    <IncludePath>$(IncludePath)</IncludePath>
     <TargetName>Serializer</TargetName>
+    <LibraryPath>$(SolutionDir)Dependencies\rttr\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -125,10 +127,12 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Dependencies\rttr;$(SolutionDir)Dependencies\fmod;$(SolutionDir)Dependencies\rapidjson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>librttr_core_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -140,12 +144,14 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Dependencies\rttr;$(SolutionDir)Dependencies\fmod;$(SolutionDir)Dependencies\rapidjson;$(SolutionDir)Dependencies\rttr\detail;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>librttr_core.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -154,7 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ContainerChecker.hpp" />
-    <ClInclude Include="logger.hpp" />
+    <ClInclude Include="Logger.hpp" />
     <ClInclude Include="Serialization.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

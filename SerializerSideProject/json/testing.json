@@ -1,9 +1,43 @@
 {
-    "DogVector": ["Cb", "Knn"],
-    "CowMap": [{
-            "cow": 1
-        }, {
-            "cownnie": 2
-        }],
-    "alllah": 1
+    "visible": true,
+    "color": "red",
+    "name": "Circle #1",
+    "position": {
+        "x": 12,
+        "y": 66
+    },
+    "dictionary": [
+        {
+            "key": "red",
+            "value": {
+                "x": 5,
+                "y": 6
+            }
+        },
+        {
+            "key": "green",
+            "value": {
+                "x": 1,
+                "y": 2
+            }
+        },
+        {
+            "key": "blue",
+            "value": {
+                "x": 3,
+                "y": 4
+            }
+        }
+    ],
+    "radius": 5.123,
+    "points": [
+        {
+            "x": 2,
+            "y": 3
+        },
+        {
+            "x": 4,
+            "y": 5
+        }
+    ]
 }
