@@ -17,7 +17,7 @@
 #include "rttr/registration.h"
 #include "rttr/type.h"
 
-#ifdef JSON
+#ifdef JSONWRITER
 #define JSON_SERIALIZE(filePath, RTTRInstance) ((void)0)
 
 #else
@@ -26,6 +26,18 @@
  { \
   JSON::SerializeToFile(filePath, RTTRInstance); \
  }
+
+#endif
+
+#ifdef JSONREADER
+#define JSON_DESERIALIZE(filePath, RTTRInstance) ((void)0)
+
+#else
+
+#define JSON_DESRIALIZE(filePath, RTTRInstance) \
+    { \
+    JSON::DeserializeFromFile(filePath, RTTRInstance); \
+    }
 
 #endif
 
@@ -45,6 +57,9 @@ namespace JSON
         {
         }
 
+        // *********************************************************
+        // *PrettyWriter Helper Functions to aid you in your serializing of data into JSON format
+        // *********************************************************
         void StartObject() const
         {
             m_Writer->StartObject();
@@ -90,33 +105,19 @@ namespace JSON
         void PutValue(const Type& key)
         {
             if constexpr (TYPETRAITS::are_same<Type, uint64_t >::value)
-            {
                 m_Writer->Uint64(key);
-            }
             else if constexpr (TYPETRAITS::are_same<Type, int64_t >::value)
-            {
                 m_Writer->Int64(key);
-            }
             else if constexpr (TYPETRAITS::are_same<Type, double>::value || TYPETRAITS::are_same<Type, float>::value)
-            {
                 m_Writer->Double(key);
-            }
             else if constexpr (TYPETRAITS::are_same<Type, bool>::value)
-            {
                 m_Writer->Bool(key);
-            }
             else if constexpr (TYPETRAITS::are_same<Type, int >::value)
-            {
                 m_Writer->Int(key);
-            }
             else if constexpr (TYPETRAITS::are_same<Type, unsigned >::value)
-            {
                 m_Writer->Uint(key);
-            }
             else if constexpr (TYPETRAITS::are_same<Type, std::string>::value || TYPETRAITS::are_same<Type, const char*>::value)
-            {
                 m_Writer->String(key.c_str());
-            }
             else
             {
                 // Should not hit this
@@ -144,6 +145,15 @@ namespace JSON
             PutContainerValue(valueContainer);
         }
 
+        // Specialized Version for serializing tuple container
+        template<typename... Containee>
+        void PutContainerTuple(const std::string& key, const std::tuple<Containee...>& valueContainer)
+        {
+            PutKey(key);
+            PutContainerTuple(valueContainer);
+        }
+        // *********************************************************
+
         // *********************************************************
         // *Using RTTR Library API to help check the type of the variable before writing it to JSON version
         // *********************************************************
@@ -153,45 +163,25 @@ namespace JSON
             if (type.is_arithmetic())
             {
                 if (type == type::get<bool>() || type == type::get<char>())
-                {
                     this->PutValue(variant.to_bool());
-                }
                 else if (type == type::get<int8_t>())
-                {
                     this->PutValue(variant.to_int8());
-                }
                 else if (type == type::get<int16_t>())
-                {
                     this->PutValue(variant.to_int16());
-                }
                 else if (type == type::get<int32_t>())
-                {
                     this->PutValue(variant.to_int32());
-                }
                 else if (type == type::get<int64_t>())
-                {
                     this->PutValue(variant.to_int64());
-                }
                 else if (type == type::get<uint8_t>())
-                {
                     this->PutValue(variant.to_uint8());
-                }
                 else if (type == type::get<uint16_t>())
-                {
                     this->PutValue(variant.to_uint16());
-                }
                 else if (type == type::get<uint32_t>())
-                {
                     this->PutValue(variant.to_uint32());
-                }
                 else if (type == type::get<uint64_t>())
-                {
                     this->PutValue(variant.to_uint64());
-                }
                 else if (type == type::get<float>() || type == type::get<double>())
-                {
                     this->PutValue(variant.to_double());
-                }
                 return true;
             }
 
@@ -276,7 +266,6 @@ namespace JSON
             static const string_view value_name("value");
 
             this->StartArray();
-
             if (variantView.is_key_only_type())
             {
                 for (const std::pair<variant, variant>& item : variantView)
@@ -306,14 +295,17 @@ namespace JSON
         {
             type valueType = variant.get_type();
             type wrappedType = valueType.is_wrapper() ? valueType.get_wrapped_type() : valueType;
-            bool isWrappedType = wrappedType != valueType;
+            const bool isWrappedType = wrappedType != valueType;
 
+            this->SetFormatOptions(PrettyFormatOptions::kFormatDefault);
             if (WriteAtomicTypes(isWrappedType ? wrappedType : valueType, isWrappedType ? variant.extract_wrapped_value() : variant))
             {
                 // Do nothing
             }
             else if (variant.is_sequential_container())
             {
+                // Write single line array when serializing a sequential container
+                this->SetFormatOptions(PrettyFormatOptions::kFormatSingleLineArray);
                 WriteArray(variant.create_sequential_view());
             }
             else if (variant.is_associative_container())
@@ -345,9 +337,9 @@ namespace JSON
         void WriteToJSONRecursively(const instance& rttrObject)
         {
             this->StartObject();
-
             instance obj = rttrObject.get_type().get_raw_type().is_wrapper() ? rttrObject.get_wrapped_instance() : rttrObject;
 
+            // Getting your derived class where the list will contain all your base type properties also
             auto propertiesList = obj.get_derived_type().get_properties();
             for (property propertie : propertiesList)
             {
@@ -377,26 +369,21 @@ namespace JSON
 
             this->EndObject();
         }
+        // *********************************************************
 
-        // Getters
+        // *********************************************************
+        // *Getters for private members
+        // *********************************************************
         PrettyWriter<StringBuffer>* GetPrettyWriter() const
         {
             return m_Writer;
         }
 
-        template<typename... Containee>
-        void PutContainerTuple(const std::string& key, const std::tuple<Containee...>& valueContainer)
-        {
-            PutKey(key);
-            PutContainerTuple(valueContainer);
-        }
-
-        // Private Variables
     private:
+        // Private Variables
         PrettyWriter<StringBuffer>* m_Writer = nullptr;
 
         // Private Functions
-    private:
         //TODO:: Multimap , Multiset not fully tested
         template<typename Type, template<typename, typename...> class Container, typename... Containee>
         void PutContainerValue(const Container<Type, Containee...>& valueContainer)
@@ -492,6 +479,7 @@ namespace JSON
         }
 
         // More optimized version compared to HasMember where it perform 1 seek instead of 2 seeks
+        // Please use this
         GenericValue<UTF8<>>::MemberIterator FindMember(const std::string& name) const
         {
             // Checking through the array if this member exist,
@@ -499,13 +487,13 @@ namespace JSON
             return m_Data->FindMember(name.c_str());
         }
 
-        Value& GetRawValue(const std::string& Key) const
+        Value& ReadRawValue(const std::string& Key) const
         {
             return (*m_Data)[Key.c_str()];
         }
 
         template <typename TValue>
-        TValue GetValue(const std::string& Key)
+        TValue ReadValue(const std::string& Key)
         {
             // Check if the key given is valid
             if (m_Data->FindMember(Key.c_str()) == m_Data->MemberEnd())
@@ -518,92 +506,52 @@ namespace JSON
             const Value& value = (*m_Data)[Key.c_str()];
 
             if constexpr (TYPETRAITS::are_same<TValue, uint64_t>::value)
-            {
                 return value.GetUint64();
-            }
-
             if constexpr (TYPETRAITS::are_same<TValue, int64_t>::value)
-            {
                 return value.GetInt64();
-            }
-
             if constexpr (TYPETRAITS::are_same<TValue, double>::value)
-            {
                 return value.GetDouble();
-            }
-
             if constexpr (TYPETRAITS::are_same<TValue, float>::value)
-            {
                 return value.GetFloat();
-            }
-
             if constexpr (TYPETRAITS::are_same<TValue, bool>::value)
-            {
                 return value.GetBool();
-            }
-
             if constexpr (TYPETRAITS::are_same<TValue, int>::value)
-            {
                 return value.GetInt();
-            }
-
             if constexpr (TYPETRAITS::are_same<TValue, unsigned>::value)
-            {
                 return value.GetUint();
-            }
-
             if constexpr (TYPETRAITS::are_same<TValue, std::string>::value || TYPETRAITS::are_same<TValue, const char*>::value)
-            {
                 return value.GetString();
-            }
+
+            // Do a assert here
+            throw 0;
         }
 
         template <typename T, typename... TValue, typename Encoding, typename Allocator = RAPIDJSON_DEFAULT_ALLOCATOR>
-        T GetValue(const GenericValue<Encoding, Allocator>& Value)
+        T ReadValue(const GenericValue<Encoding, Allocator>& Value)
         {
             if constexpr (TYPETRAITS::are_same<T, uint64_t>::value)
-            {
                 return Value.GetUint64();
-            }
-
             if constexpr (TYPETRAITS::are_same<T, int64_t>::value)
-            {
                 return Value.GetInt64();
-            }
-
             if constexpr (TYPETRAITS::are_same<T, double>::value)
-            {
                 return Value.GetDouble();
-            }
-
             if constexpr (TYPETRAITS::are_same<T, float>::value)
-            {
                 return Value.GetFloat();
-            }
-
             if constexpr (TYPETRAITS::are_same<T, bool>::value)
-            {
                 return Value.GetBool();
-            }
-
             if constexpr (TYPETRAITS::are_same<T, int>::value)
-            {
                 return Value.GetInt();
-            }
-
             if constexpr (TYPETRAITS::are_same<T, unsigned>::value)
-            {
                 return Value.GetUint();
-            }
-
             if constexpr (TYPETRAITS::are_same<T, std::string>::value || TYPETRAITS::are_same<T, const char*>::value)
-            {
                 return Value.GetString();
-            }
+
+            // Do a assert here
+            throw 0;
         }
 
         template<typename Type, template<typename, typename...> class Container, typename... Containee>
-        void GetContainerValue(Container<Type, Containee...>& valueContainer, const std::string& Key)
+        void ReadContainerValue(Container<Type, Containee...>& valueContainer, const std::string& Key)
         {
             // Check if the key given is valid
             if (m_Data->FindMember(Key.c_str()) == m_Data->MemberEnd())
@@ -635,7 +583,7 @@ namespace JSON
                             for (auto m = itr.MemberBegin(); m != itr.MemberEnd(); ++m)
                             {
                                 const std::string key = m->name.GetString();
-                                auto value = GetValue<Containee...>(m->value);
+                                auto value = ReadValue<Containee...>(m->value);
                                 valueContainer.emplace(std::make_pair(key, value));
                             }
                         }
@@ -649,7 +597,7 @@ namespace JSON
                 {
                     for (SizeType i = 0; i < data.Size(); ++i)
                     {
-                        valueContainer.push_back(GetValue<Type>(data[i]));
+                        valueContainer.push_back(ReadValue<Type>(data[i]));
                     }
                 }
             }
@@ -657,7 +605,7 @@ namespace JSON
 
         // TODO:: WIP
         template<typename Type, template<typename, typename...> class Container, typename... Containee>
-        void GetTupleValue(Container<Type, Containee...>& valueContainer, const std::string& Key)
+        void ReadTupleValue(Container<Type, Containee...>& valueContainer, const std::string& Key)
         {
             //const Value& data = (*m_Data)[Key.c_str()];
 
@@ -673,9 +621,209 @@ namespace JSON
             //}
         }
 
+
+        // *********************************************************
+        // *Using RTTR Library API to help retrieve the value + type from JSON value as a form of variant(rttr variant class which can be used for any type)
+        // *********************************************************
+
+        // Variant class allows us to store any type, and it is able to convert the type you want transparently
+        variant ReadAtomicTypes(Value& jsonValue)
+        {
+            switch (jsonValue.GetType())
+            {
+                case kNullType:
+                    break;
+                case kFalseType:
+                case kTrueType:
+                    return jsonValue.GetBool();
+                case kObjectType:
+                case kArrayType:
+                    return variant();
+                case kStringType:
+                    return std::string(jsonValue.GetString());
+                case kNumberType:
+                {
+                    if (jsonValue.IsInt())
+                        return jsonValue.GetInt();
+                    if (jsonValue.IsUint())
+                        return jsonValue.GetUint();
+                    if (jsonValue.IsInt64())
+                        return jsonValue.GetInt64();
+                    if (jsonValue.IsUint64())
+                        return jsonValue.GetUint64();
+                    if (jsonValue.IsFloat())
+                        return jsonValue.GetFloat();
+                    if (jsonValue.IsDouble())
+                        return jsonValue.GetDouble();
+                    break;
+                }
+            }
+            return variant();
+        }
+
+        variant ReadValue(const type& ArgType, Value::MemberIterator& itr)
+        {
+            Value& jsonValue = itr->value;
+            variant extractedValue = ReadAtomicTypes(jsonValue);
+
+            // Check if the value we got from JSON can be converted to the type passed in
+            bool canConvertAtomicValueToType = extractedValue.can_convert(ArgType);
+
+            if (canConvertAtomicValueToType)
+            {
+                canConvertAtomicValueToType = extractedValue.convert(ArgType);
+                std::cerr << "Unable to convert extractedValue from JSONValue into the type user is looking for !" << std::endl;
+            }
+
+            if (!canConvertAtomicValueToType)
+            {
+                if (jsonValue.IsObject())
+                {
+                    // Returns a public constructor whose parameters match the types in the specified list, else return default constructor
+                    constructor ctor = ArgType.get_constructor();
+
+                    for (const constructor& item : ArgType.get_constructors())
+                    {
+                        // If the item type is the same as ArgType, make the constructor to return the type I want
+                        if (item.get_instantiated_type() == ArgType)
+                        {
+                            ctor = item;
+                        }
+                    }
+                    // Invokes the constructor of type returned by get_instantiated_type()
+                    // Need to invoke constructor to get my variant object
+                    // Thats why I checked whether the item is same type as ArgType
+                    extractedValue = ctor.invoke();
+                    fromjson_recursively(extractedValue, jsonValue);
+                }
+            }
+            return extractedValue;
+        }
+
+        void ReadArray(variant_sequential_view& variantView, Value& jsonArrayValue)
+        {
+            // Set the size I need according to the number of elements inside the JSONValue
+            variantView.set_size(static_cast<size_t>(jsonArrayValue.Size()));
+            // 0 is int[i][i]
+            // 1 is getting int[i]
+            // 2 is int
+            // get_rank_type() is for when trying to retrieve array
+            const type arrayValueType = variantView.get_rank_type(1);
+
+            for (SizeType i = 0; i < jsonArrayValue.Size(); ++i)
+            {
+                auto& jsonIndex = jsonArrayValue[i];
+                if (jsonIndex.IsArray())
+                {
+                    auto sub_array_view = variantView.get_value(i).create_sequential_view();
+                    ReadArray(sub_array_view, jsonIndex);
+                }
+                else if (jsonIndex.IsObject())
+                {
+                    variant var_tmp = variantView.get_value(i);
+                    variant wrapped_var = var_tmp.extract_wrapped_value();
+                    fromjson_recursively(wrapped_var, jsonIndex);
+                    variantView.set_value(i, wrapped_var);
+                }
+                else
+                {
+                    variant extracted_value = ReadAtomicTypes(jsonIndex);
+                    if (extracted_value.convert(arrayValueType))
+                    {
+                        variantView.set_value(i, extracted_value);
+                    }
+                }
+            }
+        }
+
+        void ReadAssociativeContainer(variant_associative_view& variantView, Value& jsonAssociativeValue)
+        {
+            for (SizeType i = 0; i < jsonAssociativeValue.Size(); ++i)
+            {
+                auto& json_index_value = jsonAssociativeValue[i];
+                if (json_index_value.IsObject()) // a key-value associative view
+                {
+                    Value::MemberIterator key_itr = json_index_value.FindMember("key");
+                    Value::MemberIterator value_itr = json_index_value.FindMember("value");
+
+                    if (key_itr != json_index_value.MemberEnd() && value_itr != json_index_value.MemberEnd())
+                    {
+                        auto key_var = ReadValue(variantView.get_key_type(), key_itr);
+                        auto value_var = ReadValue(variantView.get_value_type(), value_itr);
+                        if (key_var && value_var)
+                        {
+                            variantView.insert(key_var, value_var);
+                        }
+                    }
+                }
+                else // a key-only associative view
+                {
+                    variant extracted_value = ReadAtomicTypes(json_index_value);
+                    if (extracted_value && extracted_value.convert(variantView.get_key_type()))
+                        variantView.insert(extracted_value);
+                }
+            }
+        }
+
+
+        void fromjson_recursively(instance obj2, Value& json_object)
+        {
+            instance obj = obj2.get_type().get_raw_type().is_wrapper() ? obj2.get_wrapped_instance() : obj2;
+            const auto prop_list = obj.get_derived_type().get_properties();
+
+            for (auto prop : prop_list)
+            {
+                Value::MemberIterator ret = json_object.FindMember(prop.get_name().data());
+                if (ret == json_object.MemberEnd())
+                    continue;
+                const type value_t = prop.get_type();
+
+                auto& json_value = ret->value;
+                switch (json_value.GetType())
+                {
+                case kArrayType:
+                {
+                    variant var;
+                    if (value_t.is_sequential_container())
+                    {
+                        var = prop.get_value(obj);
+                        auto view = var.create_sequential_view();
+                        ReadArray(view, json_value);
+                    }
+                    else if (value_t.is_associative_container())
+                    {
+                        var = prop.get_value(obj);
+                        auto associative_view = var.create_associative_view();
+                        ReadAssociativeContainer(associative_view, json_value);
+                    }
+
+                    prop.set_value(obj, var);
+                    break;
+                }
+                case kObjectType:
+                {
+                    variant var = prop.get_value(obj);
+                    fromjson_recursively(var, json_value);
+                    prop.set_value(obj, var);
+                    break;
+                }
+                default:
+                {
+                    variant extracted_value = ReadAtomicTypes(json_value);
+                    if (extracted_value.convert(value_t)) // REMARK: CONVERSION WORKS ONLY WITH "const type", check whether this is correct or not!
+                        prop.set_value(obj, extracted_value);
+                }
+                }
+            }
+        }
+
+        Value& GetValueData() const
+        {
+            return *m_Data;
+        }
+
     private:
         Value* m_Data = nullptr;
-        instance rttrObject{};
     };
 
     // This class is for whoever wish to have their data to be serialized. Some examples are components who will inherit this class
@@ -819,6 +967,8 @@ namespace JSON
 
     // *********************************************************
     // *Exposed Serialize Functions to serialize data to a JSON file
+    // *How To Use*
+    //
     // *********************************************************
     std::string ToJsonFormat(const instance& obj)
     {
@@ -852,43 +1002,76 @@ namespace JSON
     }
 
     // *********************************************************
+    // *Exposed Deserialize Functions to deserialize data from a JSON file into an instance of rttr
+    // *How To Use*
+    //
+    // *********************************************************
+    bool FromJsonFormat(std::stringstream& buffer, instance rttrObject)
+    {
+        // GenericDocument with UTF8 encoding
+        Document document;
+
+        // Create own reader
+        Reader ownReader{ document };
+
+        if (buffer.str().empty())
+        {
+            std::cerr << "Buffer from JSON is empty" << std::endl;
+            return false;
+        }
+
+        //Return false if parsing of document has error
+        if (document.Parse(buffer.str().c_str()).HasParseError())
+        {
+            std::cerr << "Parsing of JSON into string failed" << std::endl;
+            return false;
+        }
+
+        ownReader.fromjson_recursively(rttrObject, ownReader.GetValueData());
+        std::cout << "Reading of JSONValue into rttrObject successful!" << std::endl;
+        return true;
+    }
+
+    void DeserializeFromFile(const std::filesystem::path& filePath, instance rttrObject)
+    {
+        std::ifstream file{ filePath };
+        // Check if filePath is locateable
+        if (file.good())
+        {
+            std::stringstream stringBuffer;
+            stringBuffer << file.rdbuf();
+            FromJsonFormat(stringBuffer, rttrObject);
+            return;
+        }
+
+        std::cerr << "FilePath provided is incorrect!" << std::endl;
+        // Should not reach here
+        throw 0;
+    }
+
+    // *********************************************************
     // *Functions to get value out of JSON VALUE type
     // *********************************************************
     template <typename Type>
     Type GetValue(const Value& value)
     {
         if constexpr (TYPETRAITS::are_same<Type, uint64_t >::value)
-        {
             return value.GetUint64();
-        }
         if constexpr (TYPETRAITS::are_same<Type, int64_t >::value)
-        {
             return value.GetInt64();
-        }
         if constexpr (TYPETRAITS::are_same<Type, double>::value)
-        {
             return value.GetDouble();
-        }
         if constexpr (TYPETRAITS::are_same<Type, float>::value)
-        {
             return value.GetFloat();
-        }
         if constexpr (TYPETRAITS::are_same<Type, bool>::value)
-        {
             return value.GetBool();
-        }
         if constexpr (TYPETRAITS::are_same<Type, int >::value)
-        {
             return value.GetInt();
-        }
         if constexpr (TYPETRAITS::are_same<Type, unsigned >::value)
-        {
             return value.GetUint();
-        }
         if constexpr (TYPETRAITS::are_same<Type, std::string>::value || TYPETRAITS::are_same<Type, const char*>::value)
-        {
             return value.GetString();
-        }
+
         std::cerr << "Unable to return a type" << std::endl;
         throw 0;
     }

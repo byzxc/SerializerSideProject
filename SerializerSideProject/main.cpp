@@ -1,4 +1,5 @@
 #include "Serialization.hpp"
+#include <tuple>
 using namespace rttr;
 
 enum class color
@@ -40,6 +41,8 @@ struct circle : shape
 
     double radius = 5.2;
     std::vector<point2d> points;
+    std::vector<int> clown;
+    std::tuple<int, float> dick{ 1, 2.f };
 
     int no_serialize = 100;
 
@@ -50,27 +53,29 @@ struct circle : shape
 // Method = functions
 RTTR_REGISTRATION
 {
-    rttr::registration::class_<shape>("shape")
+    registration::class_<shape>("shape")
         .property("visible", &shape::get_visible, &shape::set_visible)
         .property("color", &shape::color_)
         .property("name", &shape::name)
         .property("position", &shape::position)
         .property("dictionary", &shape::dictionary);
 
-    rttr::registration::class_<circle>("circle")
+    registration::class_<circle>("circle")
         .property("radius", &circle::radius)
         .property("points", &circle::points)
+        .property("clown", &circle::clown)
+        .property("dick", &circle::dick)
         .property("no_serialize", &circle::no_serialize)
         (
             metadata("NO_SERIALIZE", true)
         );
 
-    rttr::registration::class_<point2d>("point2d")
+    registration::class_<point2d>("point2d")
         .constructor()(policy::ctor::as_object)
         .property("x", &point2d::x)
         .property("y", &point2d::y);
 
-    rttr::registration::enumeration<color>("color")
+    registration::enumeration<color>("color")
         (
             value("red", color::red),
             value("blue", color::blue),
@@ -90,18 +95,28 @@ int main()
     c_1.position.x = 12;
     c_1.position.y = 66;
 
-    // additional braces are needed for a VS 2013 bug
-    c_1.dictionary = { { {color::green, {1, 2} }, {color::blue, {3, 4} }, {color::red, {5, 6} } } };
+    c_1.dictionary = { {color::green, {1, 2} }, {color::blue, {3, 4} }, {color::red, {5, 6} } };
     c_1.radius = 5.123;
+    c_1.clown = { 1,2,3,4,5,6,7,8 };
 
     std::vector<point2d> pointzzz;
-    pointzzz.emplace_back(2,3);
+    pointzzz.emplace_back(2, 3);
     pointzzz.emplace_back(4, 5);
     c_1.points = pointzzz;
 
     c_1.no_serialize = 12345;
 
-    JSON_SERIALIZE("json\\testing.json", my_shape)
+    circle c_2{ "Circle: #2" };
+
+    JSON_SERIALIZE("json\\testing.json", c_1)
+    JSON_DESRIALIZE("json\\testing.json", c_2)
+
+    for (auto& itr : c_2.points)
+        {
+            std::cout << itr.x << ", " << itr.y << std::endl;
+        }
+
+
     //serializer.SerializeToFile("json\\testing.json");
     //serializer.DeserializeFromFile("json\\testing.json");
 }
