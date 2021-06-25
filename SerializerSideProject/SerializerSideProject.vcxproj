@@ -156,12 +156,18 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Reflect.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="TypeTraits.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ContainerChecker.hpp" />
-    <ClInclude Include="Logger.hpp" />
+    <ClInclude Include="Logger.cpp" />
+    <ClInclude Include="Logger.h" />
+    <ClInclude Include="Reflect.hpp" />
     <ClInclude Include="Serialization.hpp" />
+    <ClInclude Include="SpaceAssert.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

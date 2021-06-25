@@ -1,3 +1,12 @@
+/******************************************************************************/
+/*!
+\file       Serialization.hpp
+\author     Darren Lin (100% code contribution)
+\copyright  Copyright (C) 2021 DigiPen Institute of Technology. Reproduction
+            or disclosure of this file or its contents without the prior
+            written consent of DigiPen Institute of Technology is prohibited.
+ */
+ /******************************************************************************/
 #ifndef _SERIALIZER_HPP_
 #define _SERIALIZER_HPP_
 
@@ -11,11 +20,11 @@
 #include <sstream>
 
 #include "ContainerChecker.hpp"
+#include "SpaceAssert.h"
 #include "TypeTraits.hpp"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
-#include "rttr/registration.h"
-#include "rttr/type.h"
+#include "Reflect.hpp"
 
 #ifdef JSONWRITER
 #define JSON_SERIALIZE(filePath, RTTRInstance) ((void)0)
@@ -23,9 +32,9 @@
 #else
 
 #define JSON_SERIALIZE(filePath, RTTRInstance) \
- { \
-  JSON::SerializeToFile(filePath, RTTRInstance); \
- }
+     { \
+      JSON::SerializeToFile(filePath, RTTRInstance); \
+     }
 
 #endif
 
@@ -124,7 +133,6 @@ namespace JSON
                 std::cout << "Unable to inspect the defined Type, Seek Fail" << std::endl;
                 // Put null if seeks fail
                 m_Writer->Null();
-                // Probably do an assert here in the future.
             }
         }
 
@@ -631,36 +639,37 @@ namespace JSON
         {
             switch (jsonValue.GetType())
             {
-                case kNullType:
-                    break;
-                case kFalseType:
-                case kTrueType:
-                    return jsonValue.GetBool();
-                case kObjectType:
-                case kArrayType:
-                    return variant();
-                case kStringType:
-                    return std::string(jsonValue.GetString());
-                case kNumberType:
-                {
-                    if (jsonValue.IsInt())
-                        return jsonValue.GetInt();
-                    if (jsonValue.IsUint())
-                        return jsonValue.GetUint();
-                    if (jsonValue.IsInt64())
-                        return jsonValue.GetInt64();
-                    if (jsonValue.IsUint64())
-                        return jsonValue.GetUint64();
-                    if (jsonValue.IsFloat())
-                        return jsonValue.GetFloat();
-                    if (jsonValue.IsDouble())
-                        return jsonValue.GetDouble();
-                    break;
-                }
+            case kNullType:
+                break;
+            case kFalseType:
+            case kTrueType:
+                return jsonValue.GetBool();
+            case kObjectType:
+            case kArrayType:
+                return variant();
+            case kStringType:
+                return std::string(jsonValue.GetString());
+            case kNumberType:
+            {
+                if (jsonValue.IsInt())
+                    return jsonValue.GetInt();
+                if (jsonValue.IsUint())
+                    return jsonValue.GetUint();
+                if (jsonValue.IsInt64())
+                    return jsonValue.GetInt64();
+                if (jsonValue.IsUint64())
+                    return jsonValue.GetUint64();
+                if (jsonValue.IsFloat())
+                    return jsonValue.GetFloat();
+                if (jsonValue.IsDouble())
+                    return jsonValue.GetDouble();
+                break;
+            }
             }
             return variant();
         }
 
+        // Read the all the values that should be extracted out from the JSON Value
         variant ReadValue(const type& ArgType, Value::MemberIterator& itr)
         {
             Value& jsonValue = itr->value;
@@ -672,7 +681,6 @@ namespace JSON
             if (canConvertAtomicValueToType)
             {
                 canConvertAtomicValueToType = extractedValue.convert(ArgType);
-                std::cerr << "Unable to convert extractedValue from JSONValue into the type user is looking for !" << std::endl;
             }
 
             if (!canConvertAtomicValueToType)
@@ -694,7 +702,7 @@ namespace JSON
                     // Need to invoke constructor to get my variant object
                     // Thats why I checked whether the item is same type as ArgType
                     extractedValue = ctor.invoke();
-                    fromjson_recursively(extractedValue, jsonValue);
+                    ReadFromJsonRecursively(extractedValue, jsonValue);
                 }
             }
             return extractedValue;
@@ -708,29 +716,34 @@ namespace JSON
             // 1 is getting int[i]
             // 2 is int
             // get_rank_type() is for when trying to retrieve array
-            const type arrayValueType = variantView.get_rank_type(1);
+            const type arrayValueType = variantView.get_rank_type(0);
 
-            for (SizeType i = 0; i < jsonArrayValue.Size(); ++i)
+            for (SizeType index = 0; index < jsonArrayValue.Size(); ++index)
             {
-                auto& jsonIndex = jsonArrayValue[i];
+                auto& jsonIndex=   jsonArrayValue[index];
+
+                // Check if is container
                 if (jsonIndex.IsArray())
                 {
-                    auto sub_array_view = variantView.get_value(i).create_sequential_view();
-                    ReadArray(sub_array_view, jsonIndex);
+                    // Retrieve the data at the specified index wrapped inside std::reference_wrapper<T> 
+                    auto arrayView = variantView.get_value(index).create_sequential_view();
+                    ReadArray(arrayView, jsonIndex);
                 }
                 else if (jsonIndex.IsObject())
                 {
-                    variant var_tmp = variantView.get_value(i);
-                    variant wrapped_var = var_tmp.extract_wrapped_value();
-                    fromjson_recursively(wrapped_var, jsonIndex);
-                    variantView.set_value(i, wrapped_var);
+                    // Get the value at that particular index
+                    variant value = variantView.get_value(index);
+                    // Extract the wrapped value and copied it into a new variant
+                    variant wrappedValue = value.extract_wrapped_value();
+                    ReadFromJsonRecursively(wrappedValue, jsonIndex);
+                    variantView.set_value(index, wrappedValue);
                 }
                 else
                 {
-                    variant extracted_value = ReadAtomicTypes(jsonIndex);
-                    if (extracted_value.convert(arrayValueType))
+                    variant extractedValue = ReadAtomicTypes(jsonIndex);
+                    if (extractedValue.convert(arrayValueType))
                     {
-                        variantView.set_value(i, extracted_value);
+                        variantView.set_value(index, extractedValue);
                     }
                 }
             }
@@ -740,79 +753,91 @@ namespace JSON
         {
             for (SizeType i = 0; i < jsonAssociativeValue.Size(); ++i)
             {
-                auto& json_index_value = jsonAssociativeValue[i];
-                if (json_index_value.IsObject()) // a key-value associative view
-                {
-                    Value::MemberIterator key_itr = json_index_value.FindMember("key");
-                    Value::MemberIterator value_itr = json_index_value.FindMember("value");
+                auto& jsonValue = jsonAssociativeValue[i];
 
-                    if (key_itr != json_index_value.MemberEnd() && value_itr != json_index_value.MemberEnd())
+                // Key-Value pair value
+                if (jsonValue.IsObject())
+                {
+                    Value::MemberIterator key = jsonValue.FindMember("key");
+                    Value::MemberIterator value = jsonValue.FindMember("value");
+
+                    if (key != jsonValue.MemberEnd() && value != jsonValue.MemberEnd())
                     {
-                        auto key_var = ReadValue(variantView.get_key_type(), key_itr);
-                        auto value_var = ReadValue(variantView.get_value_type(), value_itr);
-                        if (key_var && value_var)
+                        auto keyValue = ReadValue(variantView.get_key_type(), key);
+                        auto valueValue = ReadValue(variantView.get_value_type(), value);
+                        if (keyValue && valueValue)
                         {
-                            variantView.insert(key_var, value_var);
+                            variantView.insert(keyValue, valueValue);
                         }
                     }
                 }
-                else // a key-only associative view
+                // Key only value
+                else
                 {
-                    variant extracted_value = ReadAtomicTypes(json_index_value);
-                    if (extracted_value && extracted_value.convert(variantView.get_key_type()))
-                        variantView.insert(extracted_value);
+                    variant extractedValue = ReadAtomicTypes(jsonValue);
+                    if (extractedValue && extractedValue.convert(variantView.get_key_type()))
+                    {
+                        variantView.insert(extractedValue);
+                    }
                 }
             }
         }
 
-
-        void fromjson_recursively(instance obj2, Value& json_object)
+        void ReadFromJsonRecursively(instance rttrObject, Value& jsonObject)
         {
-            instance obj = obj2.get_type().get_raw_type().is_wrapper() ? obj2.get_wrapped_instance() : obj2;
-            const auto prop_list = obj.get_derived_type().get_properties();
+            // Variant Sequential View is your vector, deque, list etc..
+            // Variant Associative View is your map, unordered map
+            instance object = rttrObject.get_type().get_raw_type().is_wrapper() ? rttrObject.get_wrapped_instance() : rttrObject;
+            // Property are your variables that you reflect
+            const auto propertyList = object.get_derived_type().get_properties();
 
-            for (auto prop : prop_list)
+            for (property propertie : propertyList)
             {
-                Value::MemberIterator ret = json_object.FindMember(prop.get_name().data());
-                if (ret == json_object.MemberEnd())
+                // Check if the property i'm looking for exist inside jsonValue
+                Value::MemberIterator propertyExist = jsonObject.FindMember(propertie.get_name().data());
+                if (propertyExist == jsonObject.MemberEnd())
+                {
                     continue;
-                const type value_t = prop.get_type();
+                }
 
-                auto& json_value = ret->value;
-                switch (json_value.GetType())
+                const type valueType = propertie.get_type();
+                auto& jsonValue = propertyExist->value;
+                switch (jsonValue.GetType())
                 {
-                case kArrayType:
-                {
-                    variant var;
-                    if (value_t.is_sequential_container())
+                    case kArrayType:
                     {
-                        var = prop.get_value(obj);
-                        auto view = var.create_sequential_view();
-                        ReadArray(view, json_value);
+                        variant value;
+                        if (valueType.is_sequential_container())
+                        {
+                            value = propertie.get_value(object);
+                            variant_sequential_view sequentialView = value.create_sequential_view();
+                            ReadArray(sequentialView, jsonValue);
+                        }
+                        else if (valueType.is_associative_container())
+                        {
+                            value = propertie.get_value(object);
+                            variant_associative_view associative_view = value.create_associative_view();
+                            ReadAssociativeContainer(associative_view, jsonValue);
+                        }
+                        propertie.set_value(object, value);
+                        break;
                     }
-                    else if (value_t.is_associative_container())
+                    case kObjectType:
                     {
-                        var = prop.get_value(obj);
-                        auto associative_view = var.create_associative_view();
-                        ReadAssociativeContainer(associative_view, json_value);
+                        variant value = propertie.get_value(object);
+                        ReadFromJsonRecursively(value, jsonValue);
+                        propertie.set_value(object, value);
+                        break;
                     }
-
-                    prop.set_value(obj, var);
-                    break;
-                }
-                case kObjectType:
-                {
-                    variant var = prop.get_value(obj);
-                    fromjson_recursively(var, json_value);
-                    prop.set_value(obj, var);
-                    break;
-                }
-                default:
-                {
-                    variant extracted_value = ReadAtomicTypes(json_value);
-                    if (extracted_value.convert(value_t)) // REMARK: CONVERSION WORKS ONLY WITH "const type", check whether this is correct or not!
-                        prop.set_value(obj, extracted_value);
-                }
+                    default:
+                    {
+                        variant extractedValue = ReadAtomicTypes(jsonValue);
+                        if (extractedValue.convert(valueType))
+                        {
+                            // REMARK: CONVERSION WORKS ONLY WITH "const type", check whether this is correct or not!
+                            propertie.set_value(object, extractedValue);
+                        }
+                    }
                 }
             }
         }
@@ -1027,7 +1052,7 @@ namespace JSON
             return false;
         }
 
-        ownReader.fromjson_recursively(rttrObject, ownReader.GetValueData());
+        ownReader.ReadFromJsonRecursively(rttrObject, ownReader.GetValueData());
         std::cout << "Reading of JSONValue into rttrObject successful!" << std::endl;
         return true;
     }

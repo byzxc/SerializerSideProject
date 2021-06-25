@@ -1,3 +1,12 @@
+/******************************************************************************/
+/*!
+\file       TypeTraits.hpp
+\author     Darren Lin (100% code contribution)
+\copyright  Copyright (C) 2021 DigiPen Institute of Technology. Reproduction
+            or disclosure of this file or its contents without the prior
+            written consent of DigiPen Institute of Technology is prohibited.
+ */
+ /******************************************************************************/
 #ifndef _TYPETRAITS_HPP_
 #define _TYPETRAITS_HPP_
 

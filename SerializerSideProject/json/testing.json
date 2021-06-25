@@ -1,7 +1,4 @@
 {
-    "visible": true,
-    "color": "red",
-    "name": "Circle #1",
     "position": {
         "x": 12,
         "y": 66
@@ -40,5 +37,9 @@
         }
     ],
     "clown": [1, 2, 3, 4, 5, 6, 7, 8],
-    "dick": ""
+    "allah": {
+        "x": 2.0,
+        "y": 4.0,
+        "z": 5.0
+    }
 }
