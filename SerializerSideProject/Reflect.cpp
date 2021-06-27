@@ -33,6 +33,8 @@ namespace Reflect
             .property("points", &circle::points)//(policy::prop::bind_as_ptr)
             .property("clown", &circle::clown)//(policy::prop::bind_as_ptr)
             .property("allah", &circle::allah)//(policy::prop::bind_as_ptr)
+            .method("radiusDouble", &circle::radiusDouble)
+            .method("radiusDoubles", &circle::radiusDoubles)
             .property("no_serialize", &circle::no_serialize)(metadata("NO_SERIALIZE", true));
 
         registration::class_<point2d>("point2d")

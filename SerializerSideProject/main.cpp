@@ -31,11 +31,24 @@ int main()
     circle c_2{ "Circle: #2" };
 
     JSON_SERIALIZE("json\\testing.json", c_1)
+    JSON_DESRIALIZE("json\\testing.json", c_2)
 
-        JSON_DESRIALIZE("json\\testing.json", c_2)
+    auto valuesData = InvokeRegisteredClassFunctionRecursively<circle>("radiusDouble", "circle", {}, { 2.f, 3.f });
+    auto valueData = InvokeRegisteredClassFunction<circle>("radiusDoubles", "circle", {}, { 3.f, 2.f });
+    std::cout << valueData.get_value<double>();
 
-        for (auto itr : InvokeGlobalRegisteredFunction("sin", {1.f, 2.f}))
+    for (auto itr : valuesData)
+    {
+        if (itr.is_valid() && itr.is_type<double>())
         {
-            std::cout << GetValueFromVariant<float>(itr) << std::endl;
+            std::cout << itr.get_value<double>() << std::endl;
         }
+    }
+
+    //auto valueDatas = InvokeRegisteredClassFunction<circle>("radiusDoubles", "circle", {}, )
+
+    for (auto itr : InvokeGlobalRegisteredFunction("sin", { 1.f, 2.f }))
+    {
+        std::cout << GetValueFromVariant<float>(itr) << std::endl;
+    }
 }

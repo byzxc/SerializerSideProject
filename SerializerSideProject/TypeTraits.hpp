@@ -10,6 +10,8 @@
 #ifndef _TYPETRAITS_HPP_
 #define _TYPETRAITS_HPP_
 
+#include <algorithm>
+#include <iostream>
 #include <type_traits>
 #include <utility>
 
